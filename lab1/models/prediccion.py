@@ -6,11 +6,11 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import RobustScaler, OneHotEncoder
 
 # 1. Cargar el modelo final
-modelo_final = joblib.load("lab1/models/modelo_final.pkl")
+modelo_final = joblib.load("modelo_final.pkl")
 print("Modelo cargado correctamente.")
 
 # 2. Cargar el dataset de competición
-data_comp_path = "lab1/data/attrition_competition_05.csv"  # Ajusta la ruta si es necesario
+data_comp_path = "/Users/alfredofelices/PycharmProjects/ArendizajeAutomatico/lab1/data/attrition_competition_05.csv"  # Ajusta la ruta si es necesario
 df_comp = pd.read_csv(data_comp_path)
 print("Dimensiones del dataset de competición:", df_comp.shape)
 
@@ -51,5 +51,5 @@ df_result = pd.DataFrame({
     'EmployeeID': df_comp['EmployeeID'],  # Asumiendo que la columna EmployeeID existe
     'Attrition_Pred': predicciones
 })
-df_result.to_csv("lab1/predicciones.csv", index=False)
+df_result.to_csv("predicciones.csv", index=False)
 print("Archivo 'predicciones.csv' guardado correctamente.")

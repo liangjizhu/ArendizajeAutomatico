@@ -42,7 +42,7 @@ SEED = 495723
 np.random.seed(SEED)
 
 # 2. Exploración de Datos (EDA)
-data_path = "lab1/data/attrition_availabledata_05.csv"  # Ajusta la ruta si es necesario
+data_path = "/Users/alfredofelices/PycharmProjects/ArendizajeAutomatico/lab1/data/attrition_availabledata_05.csv"  # Ajusta la ruta si es necesario
 df = pd.read_csv(data_path)
 
 print("Dimensiones del dataset:", df.shape)
@@ -296,8 +296,8 @@ print("Por ello, se seleccionará el modelo KNN optimizado (por ejemplo, con n_n
 
 # 6. Guardado del Modelo Final
 best_knn_model = grid_search_knnHPO.best_estimator_
-joblib.dump(best_knn_model, "lab1/models/modelo_final.pkl")
-print("\nModelo final guardado como 'lab1/models/modelo_final.pkl'")
+joblib.dump(best_knn_model, "modelo_final.pkl")
+print("\nModelo final guardado como 'modelo_final.pkl'")
 
 # 7. Conclusiones y Comentarios
 print("\n--- Conclusiones y Comentarios ---")

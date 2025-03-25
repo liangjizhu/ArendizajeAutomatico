@@ -26,7 +26,7 @@ import seaborn as sns
 import time
 import joblib
 
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold, cross_val_score
+from sklearn.model_selection import train_test_split, GridSearchCV, KFold, cross_val_score, StratifiedKFold
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler, OneHotEncoder, LabelEncoder
@@ -103,7 +103,7 @@ knn_pipeline = Pipeline(steps=[
 
 # 4.1 Modelos Básicos: KNN y Árboles
 # Evaluar diferentes pipelines numéricos para KNN
-inner = KFold(n_splits=3, shuffle=True, random_state=SEED)
+inner = StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED)
 numeric_pipelines = [
     Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', StandardScaler())]),
     Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', StandardScaler())]),
@@ -246,8 +246,9 @@ start_time = time.time()
 log_reg_pipeline.fit(X_train, y_train)
 log_reg_time = time.time() - start_time
 print("\nLogistic Regression Default Training Time: {:.4f} seconds".format(log_reg_time))
-y_pred_log = log_reg_pipeline.predict(X_train)
-print("Balanced Accuracy Logistic Regression (default):", balanced_accuracy_score(y_train, y_pred_log))
+cv_scores = cross_val_score(log_reg_time, X_train, y_train, cv=inner, scoring='balanced_accuracy')
+print("\nRegresion Logistica Default CV scores:", cv_scores)
+print("Mean Regresion Logistica Default CV score: {:.4f}".format(cv_scores.mean()))
 
 # Regresión Logística HPO
 log_reg_param_grid = {

@@ -10,7 +10,7 @@ modelo_final = joblib.load("modelo_final.pkl")
 print("Modelo cargado correctamente.")
 
 # 2. Cargar el dataset de competición
-data_comp_path = "/Users/alfredofelices/PycharmProjects/ArendizajeAutomatico/lab1/data/attrition_competition_05.csv"  # Ajusta la ruta si es necesario
+data_comp_path = "../data/attrition_competition_05.csv"  # Ajusta la ruta si es necesario
 df_comp = pd.read_csv(data_comp_path)
 print("Dimensiones del dataset de competición:", df_comp.shape)
 

@@ -15,7 +15,7 @@ Estructura del script:
 6. Guardado del modelo final
 7. Análisis de resultados y comentarios
 
-Nota: Se utiliza el dataset "attrition_availabledata_05.csv" (asegúrate de que la ruta sea correcta).
+Nota: Se utiliza el dataset "attrition_availabledata_05.csv". Asegúrate de que la ruta sea correcta.
 """
 
 # 1. Importación de librerías y configuración
@@ -26,7 +26,7 @@ import seaborn as sns
 import time
 import joblib
 
-from sklearn.model_selection import train_test_split, GridSearchCV, KFold, cross_val_score, StratifiedKFold
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler, OneHotEncoder, LabelEncoder
@@ -37,12 +37,12 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix, classification_report
 
-# Fijamos la semilla para la reproducibilidad (utiliza tu NIA)
+# Fijamos la semilla para la reproducibilidad (usa tu NIA)
 SEED = 495723
 np.random.seed(SEED)
 
 # 2. Exploración de Datos (EDA)
-data_path = "/Users/alfredofelices/PycharmProjects/ArendizajeAutomatico/lab1/data/attrition_availabledata_05.csv"  # Ajusta la ruta si es necesario
+data_path = "../data/attrition_availabledata_05.csv"  # Ajusta la ruta si es necesario
 df = pd.read_csv(data_path)
 
 print("Dimensiones del dataset:", df.shape)
@@ -82,7 +82,8 @@ categorical_pipeline = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='most_frequent')),
     ('onehot', OneHotEncoder(handle_unknown='ignore'))
 ])
-# Pipeline para variables numéricas (se probarán distintos métodos, pero en la selección final usamos RobustScaler con imputación por media)
+# Pipeline para variables numéricas
+# Se evaluarán distintos métodos; en la selección final se eligió RobustScaler con imputación por media
 numeric_pipeline = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='median')),
     ('scaler', StandardScaler())
@@ -181,6 +182,7 @@ print("Best CV balanced accuracy for Trees: {:.4f}".format(grid_search_treeHPO.b
 tree_results = grid_search_treeHPO.cv_results_['mean_test_score']
 
 # Visualización del efecto de los hiperparámetros
+import matplotlib.pyplot as plt
 plt.figure(figsize=(18, 12))
 plt.subplot(2,3,1)
 plt.plot(tree_param_grid['tree__max_depth'],
@@ -246,9 +248,10 @@ start_time = time.time()
 log_reg_pipeline.fit(X_train, y_train)
 log_reg_time = time.time() - start_time
 print("\nLogistic Regression Default Training Time: {:.4f} seconds".format(log_reg_time))
-cv_scores = cross_val_score(log_reg_time, X_train, y_train, cv=inner, scoring='balanced_accuracy')
-print("\nRegresion Logistica Default CV scores:", cv_scores)
-print("Mean Regresion Logistica Default CV score: {:.4f}".format(cv_scores.mean()))
+# Evaluación usando cross_val_score con el pipeline correcto (no log_reg_time)
+cv_scores_log = cross_val_score(log_reg_pipeline, X_train, y_train, cv=inner, scoring='balanced_accuracy')
+print("Logistic Regression Default CV scores:", cv_scores_log)
+print("Mean Logistic Regression Default CV score: {:.4f}".format(cv_scores_log.mean()))
 
 # Regresión Logística HPO
 log_reg_param_grid = {
@@ -292,8 +295,8 @@ print("KNN Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_sea
 print("Trees Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_search_treeHPO.best_score_))
 print("Logistic Regression Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_search_log.best_score_))
 print("SVM Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_search_svm.best_score_))
-print("\nBasado en estos resultados, el modelo KNN optimizado muestra el mejor desempeño en términos de balanced accuracy y estabilidad.\n")
-print("Por ello, se seleccionará el modelo KNN optimizado (por ejemplo, con n_neighbors=7, weights='distance', metric='euclidean') para realizar las predicciones en el conjunto de competición.")
+print("\nBasado en estos resultados, el modelo KNN optimizado muestra el mejor desempeño en términos de balanced accuracy y estabilidad.")
+print("Por ello, se seleccionará el modelo KNN optimizado para realizar las predicciones en el conjunto de competición.")
 
 # 6. Guardado del Modelo Final
 best_knn_model = grid_search_knnHPO.best_estimator_
@@ -306,6 +309,6 @@ print("• Se han explorado y preprocesado los datos, definiendo pipelines para 
 print("• La evaluación interna (usando validación cruzada y GridSearchCV) permitió ajustar los hiperparámetros de los modelos básicos (KNN y Árboles) y avanzados (Regresión Logística y SVM).")
 print("• Entre los modelos evaluados, el KNN optimizado mostró el mejor desempeño en términos de balanced accuracy y estabilidad.")
 print("• Por lo tanto, el modelo final para la competición será el KNN optimizado.")
-print("• Se recomienda complementar este análisis con la evaluación outer en el conjunto de test y la documentación del uso de herramientas como ChatGPT.")
+print("• Se recomienda complementar este análisis con la evaluación outer en el conjunto de test y documentar el uso de herramientas como ChatGPT.")
 
 # Fin del script.

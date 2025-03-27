@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
+import joblib
 
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
@@ -13,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
-from sklearn.metrics import balanced_accuracy_score
+from sklearn.metrics import balanced_accuracy_score, confusion_matrix, accuracy_score
 from sklearn.dummy import DummyClassifier
 
 
@@ -355,3 +356,40 @@ if grid_search_svm.best_params_['svm__kernel'] == 'linear':
     print(feature_importance_svm.sort_values(ascending=False))
 else:
     print("\nSVM con kernel no lineal (RBF) no permite extraer directamente importancia de atributos.")
+# Usamos el mejor modelo de SVM obtenido en la evaluación interna
+best_svm = grid_search_svm.best_estimator_
+y_test_pred = best_svm.predict(X_test)
+
+# Calcular métricas
+acc = accuracy_score(y_test, y_test_pred)
+bal_acc = balanced_accuracy_score(y_test, y_test_pred)
+cm = confusion_matrix(y_test, y_test_pred)
+TN, FP, FN, TP = cm.ravel()  # Asumimos orden: [ [TN, FP], [FN, TP] ]
+TPR = TP / (TP + FN)  # Sensibilidad
+TNR = TN / (TN + FP)  # Especificidad
+
+print("\n--- Evaluación Outer (conjunto de test) ---")
+print("Accuracy:", acc)
+print("Balanced Accuracy:", bal_acc)
+print("Matriz de Confusión:\n", cm)
+print("TPR (Sensibilidad): {:.4f}".format(TPR))
+print("TNR (Especificidad): {:.4f}".format(TNR))
+
+# Una vez evaluado el modelo, entrenamos el modelo final usando todo el dataset disponible.
+# Para ello, entrenamos el pipeline final en X e y (del dataset "available data").
+# Extraer los mejores parámetros y quitar el prefijo 'svm__'
+svm_best_params = grid_search_svm.best_params_
+params_for_svc = { key.replace('svm__', ''): value for key, value in svm_best_params.items() }
+
+final_pipeline = Pipeline(steps=[
+    ('preprocessing', preprocessing_pipeline),
+    ('svm', SVC(random_state=SEED, **params_for_svc))
+])
+start_time = time.time()
+final_pipeline.fit(X, y)
+final_training_time = time.time() - start_time
+print("\nTiempo de entrenamiento del modelo final:", final_training_time, "segundos")
+
+# Guardar el modelo final en un fichero "modelo_final.pkl"
+joblib.dump(final_pipeline, "modelo_final.pkl")
+print("Modelo final guardado en 'modelo_final.pkl'")

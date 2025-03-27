@@ -1,4 +1,4 @@
-# ArendizajeAutomatico
+# Arendizaje Automático
 
 - Alfredo Marías Felices Vera 100495820@alumnos.uc3m.es
 - Liang Ji Zhu 100495723@alumnos.uc3m.es 

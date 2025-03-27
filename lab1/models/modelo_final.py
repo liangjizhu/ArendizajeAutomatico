@@ -1,314 +1,357 @@
-"""
-Predicción del Abandono de Empleados
-
-Objetivo:
-Predecir si un empleado abandonará la empresa (burnout/attrition) mediante diversas técnicas de aprendizaje automático.
-
-Estructura del script:
-1. Importación de librerías y configuración
-2. Exploración de Datos (EDA)
-3. Preprocesamiento de los Datos (pipelines, escalado e imputación)
-4. Modelado:
-   - Modelos básicos: KNN y Árboles
-   - Modelos avanzados: Regresión Logística y SVM
-5. Evaluación interna (inner) y selección del modelo final
-6. Guardado del modelo final
-7. Análisis de resultados y comentarios
-
-Nota: Se utiliza el dataset "attrition_availabledata_05.csv". Asegúrate de que la ruta sea correcta.
-"""
-
-# 1. Importación de librerías y configuración
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import time
-import joblib
 
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler, OneHotEncoder, LabelEncoder
-from sklearn.compose import ColumnTransformer
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import balanced_accuracy_score
+from sklearn.dummy import DummyClassifier
 
-# Fijamos la semilla para la reproducibilidad (usa tu NIA)
+
+# Fijamos la semilla para la reproducibilidad (NIA)
 SEED = 495723
 np.random.seed(SEED)
 
-# 2. Exploración de Datos (EDA)
-data_path = "../data/attrition_availabledata_05.csv"  # Ajusta la ruta si es necesario
+# 1. Cargamos el dataset
+data_path = "lab1/data/attrition_availabledata_05.csv"
 df = pd.read_csv(data_path)
 
-print("Dimensiones del dataset:", df.shape)
-print("\nTipos de variables:")
+# 2. Dimensiones y primeras filas
+print("En esta primera exploración hemos podido observar que la dimensión de nuestro dataset es:", df.shape)
+print("\nPor ejemplo, las 5 primeras filas del dataset se ven así:")
+# display(df.head())
+
+# 3. Información general de columnas
+print("\nInformación general del DataFrame:")
+df.info()
+
+# 4. Tipos de variables
+print("\nLos tipos de variable de las 31 columnas:")
 print(df.dtypes)
-print("\nEstadísticas descriptivas:")
-print(df.describe())
+
+# 5. Estadísticas descriptivas de columnas numéricas
+num_cols = df.select_dtypes(include=['int64', 'float64']).columns
+print("\nEstadísticas descriptivas (numéricas), para ello seleccionamos las de tipo entero y coma floantante:")
+# display(df[num_cols].describe())
+
+# 6. Revisión de valores nulos
 print("\nValores nulos por columna:")
 print(df.isnull().sum())
 
-# Visualización del balance de la variable objetivo
-plt.figure(figsize=(6,4))
+# 7. Análisis de columnas categóricas
+cat_cols = df.select_dtypes(include=['object']).columns
+if len(cat_cols) > 0:
+    print("\nColumnas categóricas y sus valores únicos:")
+    for col in cat_cols:
+        print(f"\nColumna: {col}")
+        print("Valores únicos:", df[col].unique())
+        print("Conteo de valores:\n", df[col].value_counts(dropna=False))
+else:
+    print("\nNo se encontraron columnas categóricas (object).")
+
+# 8. Verificar filas duplicadas
+dup_rows = df.duplicated().sum()
+print(f"\nNúmero de filas duplicadas: {dup_rows}")
+print("\nNo se han encontrado filas duplicadas")
+
+# 9. Columnas constantes o casi constantes
+for col in df.columns:
+    if df[col].nunique() == 1:
+        print(f"La columna '{col}' es constante (valor único: {df[col].unique()[0]})")
+
+# 10. Distribución de la variable objetivo (si existe la columna 'Attrition')
+if 'Attrition' in df.columns:
+    print("\nDistribución de la variable objetivo (Attrition):")
+    print(df['Attrition'].value_counts(dropna=False))
+
+plt.figure(figsize=(5, 5))
 sns.countplot(x='Attrition', data=df)
 plt.title("Distribución de Attrition")
-plt.show()
+# plt.show()
 
-# 3. Preprocesamiento de los Datos
-
-# Determinar columnas numéricas y categóricas, excluyendo columnas de ID y la variable objetivo.
+# Eliminar columnas constantes e irrelevantes para el modelado:
+cols_to_drop = ['EmployeeCount', 'Over18', 'StandardHours']
+df = df.drop(columns=cols_to_drop)
+# Seleccionar las columnas numéricas y categóricas (excluyendo la variable objetivo 'Attrition')
 num_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
 cat_cols = df.select_dtypes(include=['object']).columns.tolist()
-cols_excluir = ['EmployeeID', 'EmployeeCount', 'Attrition']
-num_cols = [col for col in num_cols if col not in cols_excluir]
-cat_cols = [col for col in cat_cols if col not in cols_excluir]
-
-# 3.1 División de Datos: Holdout (2/3 train y 1/3 test)
-X = df.drop(columns=['Attrition'])
-y = df['Attrition']
+# Excluir Attrition
+num_cols = [col for col in num_cols if col != 'Attrition']
+cat_cols = [col for col in cat_cols if col != 'Attrition']
+# Codificar la variable objetivo
 label_encoder = LabelEncoder()
-y = label_encoder.fit_transform(y)  # Codifica las etiquetas
+y = label_encoder.fit_transform(df['Attrition'])
+X = df.drop(columns=['Attrition'])
+
+# Dividir en entrenamiento y test (holdout: 2/3 train, 1/3 test)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1/3, random_state=SEED, stratify=y)
 print("Train:", X_train.shape, "Test:", X_test.shape)
 
-# 3.2 Definir Pipelines para preprocesamiento
-# Pipeline para variables categóricas
+# Definir pipeline para variables categóricas
 categorical_pipeline = Pipeline(steps=[
     ('imputer', SimpleImputer(strategy='most_frequent')),
     ('onehot', OneHotEncoder(handle_unknown='ignore'))
 ])
-# Pipeline para variables numéricas
-# Se evaluarán distintos métodos; en la selección final se eligió RobustScaler con imputación por media
-numeric_pipeline = Pipeline(steps=[
-    ('imputer', SimpleImputer(strategy='median')),
-    ('scaler', StandardScaler())
-])
-# Combinar ambos pipelines
-preprocessing_pipeline = ColumnTransformer(transformers=[
-    ('num', numeric_pipeline, num_cols),
-    ('cat', categorical_pipeline, cat_cols)
-])
+numeric_pipelines = {
+    'MinMax + median': Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', MinMaxScaler())]),
+    'Standard + median': Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', StandardScaler())]),
+    'Robust + median': Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', RobustScaler())]),
+    'MinMax + mean': Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', MinMaxScaler())]),
+    'Standard + mean': Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', StandardScaler())]),
+    'Robust + mean': Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', RobustScaler())])
+}
 
-# Definir pipeline completo con KNN (modelo básico)
-knn_pipeline = Pipeline(steps=[
-    ('preprocessing', preprocessing_pipeline),
-    ('knn', KNeighborsClassifier())
-])
-
-# 4. Modelado
-
-# 4.1 Modelos Básicos: KNN y Árboles
-# Evaluar diferentes pipelines numéricos para KNN
 inner = StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED)
-numeric_pipelines = [
-    Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', StandardScaler())]),
-    Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', StandardScaler())]),
-    Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', RobustScaler())]),
-    Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', RobustScaler())]),
-    Pipeline(steps=[('imputer', SimpleImputer(strategy='median')), ('scaler', MinMaxScaler())]),
-    Pipeline(steps=[('imputer', SimpleImputer(strategy='mean')), ('scaler', MinMaxScaler())])
-]
+results_pipelines = {}
 
 print("\nEvaluando distintos pipelines numéricos para KNN:")
-for i, num_pipe in enumerate(numeric_pipelines):
-    print(f"\nEvaluating pipeline {i+1}")
-    curr_preprocessing = ColumnTransformer(transformers=[
+for name, num_pipe in numeric_pipelines.items():
+    preproc = ColumnTransformer(transformers=[
         ('num', num_pipe, num_cols),
         ('cat', categorical_pipeline, cat_cols)
     ])
-    curr_knn_pipeline = Pipeline(steps=[
-        ('preprocessing', curr_preprocessing),
+    pipeline = Pipeline(steps=[
+        ('preprocessing', preproc),
         ('knn', KNeighborsClassifier())
     ])
-    cv_scores = cross_val_score(curr_knn_pipeline, X_train, y_train, cv=inner, scoring='balanced_accuracy')
-    print("CV balanced accuracy scores:", cv_scores)
-    print("Mean CV balanced accuracy: {:.4f}".format(cv_scores.mean()))
+    scores = cross_val_score(pipeline, X_train, y_train, cv=inner, scoring='balanced_accuracy')
+    results_pipelines[name] = scores.mean()
+    print(f"{name}: CV balanced accuracy = {scores.mean():.4f}")
 
-# Seleccionar el pipeline con RobustScaler + imputación por media (supuesto el mejor rendimiento)
-numeric_pipeline = Pipeline(steps=[
-    ('imputer', SimpleImputer(strategy='mean')),
-    ('scaler', RobustScaler())
-])
+# Seleccionar la mejor combinación
+best_pipeline_name = max(results_pipelines, key=results_pipelines.get)
+print("\nMejor pipeline numérico según KNN:", best_pipeline_name)
+
+# La mejor opción de escalado fue "Robust + median", definimos el pipeline definitivo:
+numeric_pipeline_best = numeric_pipelines[best_pipeline_name]
 preprocessing_pipeline = ColumnTransformer(transformers=[
-    ('num', numeric_pipeline, num_cols),
+    ('num', numeric_pipeline_best, num_cols),
     ('cat', categorical_pipeline, cat_cols)
 ])
-knn_pipeline = Pipeline(steps=[
+
+# KNN default
+knn_default = Pipeline(steps=[
     ('preprocessing', preprocessing_pipeline),
     ('knn', KNeighborsClassifier())
 ])
-cv_scores = cross_val_score(knn_pipeline, X_train, y_train, cv=inner, scoring='balanced_accuracy')
-print("\nKNN Default CV scores:", cv_scores)
-print("Mean KNN Default CV score: {:.4f}".format(cv_scores.mean()))
+start_time = time.time()
+knn_default.fit(X_train, y_train)
+knn_default_time = time.time() - start_time
+knn_default_scores = cross_val_score(knn_default, X_train, y_train, cv=inner, scoring='balanced_accuracy')
+print("\nKNN default:")
+print("Tiempo de entrenamiento:", knn_default_time, "segundos")
+print("CV Balanced Accuracy:", knn_default_scores.mean())
 
-# KNN HPO: Ajuste de hiperparámetros para KNN con GridSearchCV
+# Árboles default
+tree_default = Pipeline(steps=[
+    ('preprocessing', preprocessing_pipeline),
+    ('tree', DecisionTreeClassifier(random_state=SEED))
+])
+start_time = time.time()
+tree_default.fit(X_train, y_train)
+tree_default_time = time.time() - start_time
+tree_default_scores = cross_val_score(tree_default, X_train, y_train, cv=inner, scoring='balanced_accuracy')
+print("\nÁrboles default:")
+print("Tiempo de entrenamiento:", tree_default_time, "segundos")
+print("CV Balanced Accuracy:", tree_default_scores.mean())
+
+# Evaluación con un modelo trivial (dummy) para referencia
+dummy = Pipeline(steps=[
+    ('dummy', DummyClassifier(strategy='most_frequent'))
+])
+dummy_scores = cross_val_score(dummy, X_train, y_train, cv=inner, scoring='balanced_accuracy')
+print("\nModelo Dummy (estrategia 'most_frequent') CV Balanced Accuracy:", dummy_scores.mean())
+
+# KNN HPO
 knn_param_grid = {
     'knn__n_neighbors': [3, 5, 7, 9, 11, 13, 15],
     'knn__weights': ['uniform', 'distance'],
     'knn__metric': ['euclidean', 'manhattan', 'minkowski']
 }
-grid_search_knnHPO = GridSearchCV(estimator=knn_pipeline, param_grid=knn_param_grid, cv=inner, scoring='balanced_accuracy')
-grid_search_knnHPO.fit(X_train, y_train)
-print("\nBest parameters for KNN:", grid_search_knnHPO.best_params_)
-print("Best CV balanced accuracy for KNN: {:.4f}".format(grid_search_knnHPO.best_score_))
-knn_results = grid_search_knnHPO.cv_results_['mean_test_score']
+grid_search_knn = GridSearchCV(estimator=knn_default, param_grid=knn_param_grid, cv=inner, scoring='balanced_accuracy')
+start_time = time.time()
+grid_search_knn.fit(X_train, y_train)
+knn_hpo_time = time.time() - start_time
+print("\nKNN HPO:")
+print("Mejores parámetros:", grid_search_knn.best_params_)
+print("Mejor CV Balanced Accuracy:", grid_search_knn.best_score_)
+print("Tiempo de HPO para KNN:", knn_hpo_time, "segundos")
 
-# Árboles de Decisión: Modelo básico
-tree_pipeline = Pipeline(steps=[
-    ('preprocessing', preprocessing_pipeline),
-    ('tree', DecisionTreeClassifier(random_state=SEED))
-])
-cv_scores_tree = cross_val_score(tree_pipeline, X_train, y_train, cv=inner, scoring='balanced_accuracy')
-print("\nTrees Default CV scores:", cv_scores_tree)
-print("Mean Trees Default CV score: {:.4f}".format(cv_scores_tree.mean()))
-
-# Árboles HPO: Ajuste de hiperparámetros
+# Árboles HPO
 tree_param_grid = {
-    'tree__max_depth': [None, 10, 15, 20, 30, 40, 50],
+    'tree__max_depth': [None, 10, 15, 20, 30],
     'tree__min_samples_split': [2, 5, 10],
     'tree__min_samples_leaf': [1, 2, 4]
 }
-grid_search_treeHPO = GridSearchCV(estimator=tree_pipeline, param_grid=tree_param_grid, cv=inner, scoring='balanced_accuracy')
+grid_search_tree = GridSearchCV(estimator=tree_default, param_grid=tree_param_grid, cv=inner, scoring='balanced_accuracy')
 start_time = time.time()
-grid_search_treeHPO.fit(X_train, y_train)
-end_time = time.time()
-print("\nBest parameters for Trees:", grid_search_treeHPO.best_params_)
-print("Best CV balanced accuracy for Trees: {:.4f}".format(grid_search_treeHPO.best_score_))
-tree_results = grid_search_treeHPO.cv_results_['mean_test_score']
+grid_search_tree.fit(X_train, y_train)
+tree_hpo_time = time.time() - start_time
+print("\nÁrboles HPO:")
+print("Mejores parámetros:", grid_search_tree.best_params_)
+print("Mejor CV Balanced Accuracy:", grid_search_tree.best_score_)
+print("Tiempo de HPO para Árboles:", tree_hpo_time, "segundos")
 
-# Visualización del efecto de los hiperparámetros
-import matplotlib.pyplot as plt
-plt.figure(figsize=(18, 12))
-plt.subplot(2,3,1)
-plt.plot(tree_param_grid['tree__max_depth'],
-         [tree_results[i] for i in range(len(tree_param_grid['tree__max_depth']))],
-         marker='o', linestyle='-')
-plt.xlabel("Max Depth")
+knn_results = grid_search_knn.cv_results_['mean_test_score']
+neighbors = knn_param_grid['knn__n_neighbors']
+# Como GridSearch evalúa combinaciones, se puede extraer el efecto de n_neighbors para un valor fijo de weights y metric,
+# por ejemplo, weights='distance' y metric='manhattan'.
+selected_indices = [i for i, params in enumerate(grid_search_knn.cv_results_['params'])
+                    if params['knn__weights']=='distance' and params['knn__metric']=='manhattan']
+neighbors_scores = [grid_search_knn.cv_results_['mean_test_score'][i] for i in selected_indices]
+
+plt.figure(figsize=(16,9))
+plt.plot(neighbors, neighbors_scores, marker='o', linestyle='-')
+plt.xlabel("Número de vecinos")
 plt.ylabel("CV Balanced Accuracy")
-plt.title("Effect of max_depth on Trees")
+plt.title("Efecto de n Vecinos en KNN\n(weights='distancia', métrica='manhattan')")
+# plt.show()
 
-plt.subplot(2,3,2)
-plt.plot(tree_param_grid['tree__min_samples_split'],
-         [tree_results[i] for i in range(len(tree_param_grid['tree__min_samples_split']))],
-         marker='s', linestyle='-', color="red")
-plt.xlabel("Min Samples Split")
+tree_results = grid_search_tree.cv_results_['mean_test_score']
+max_depths = tree_param_grid['tree__max_depth']
+# Filtramos para un valor fijo de min_samples_split y min_samples_leaf, por ejemplo, min_samples_split=2, min_samples_leaf=1
+selected_indices_tree = [i for i, params in enumerate(grid_search_tree.cv_results_['params'])
+                         if params['tree__min_samples_split']==2 and params['tree__min_samples_leaf']==1]
+depth_scores = [grid_search_tree.cv_results_['mean_test_score'][i] for i in selected_indices_tree]
+
+plt.figure(figsize=(16, 9))
+plt.plot(max_depths, depth_scores, marker='o', linestyle='-')
+plt.xlabel("max_depth")
 plt.ylabel("CV Balanced Accuracy")
-plt.title("Effect of min_samples_split on Trees")
+plt.title("Efecto de max_depth en Árboles\n(min_samples_split=2, min_samples_leaf=1)")
+# plt.show()
 
-plt.subplot(2,3,3)
-plt.plot(tree_param_grid['tree__min_samples_leaf'],
-         [tree_results[i] for i in range(len(tree_param_grid['tree__min_samples_leaf']))],
-         marker='^', linestyle='-', color="green")
-plt.xlabel("Min Samples Leaf")
+# Para esta gráfica, fijamos max_depth a un valor (por ejemplo, 15) y min_samples_leaf a 1
+# Se extraen las combinaciones con max_depth == 15 y min_samples_leaf == 1
+selected_indices_split = [i for i, params in enumerate(grid_search_tree.cv_results_['params'])
+                          if params['tree__max_depth'] == 15 and params['tree__min_samples_leaf'] == 1]
+split_values = [grid_search_tree.cv_results_['params'][i]['tree__min_samples_split'] for i in selected_indices_split]
+split_scores = [grid_search_tree.cv_results_['mean_test_score'][i] for i in selected_indices_split]
+
+plt.figure(figsize=(16,9))
+plt.plot(split_values, split_scores, marker='o', linestyle='-')
+plt.xlabel("min_samples_split")
 plt.ylabel("CV Balanced Accuracy")
-plt.title("Effect of min_samples_leaf on Trees")
+plt.title("Efecto de min_samples_split en Árboles\n(max_depth=15, min_samples_leaf=1)")
+# plt.show()
 
-plt.subplot(2,3,4)
-weights = knn_param_grid['knn__weights']
-mean_scores_weights = [knn_results[i] for i in range(len(weights))]
-plt.plot(weights, mean_scores_weights, marker='o', linestyle='-', color="blue")
-plt.xlabel("KNN Weights")
-plt.ylabel("CV Balanced Accuracy")
-plt.title("Effect of weights on KNN")
+# Definimos los pipelines, categórico y numérico
+# aunque ya estaban definidas previamente para el KNN y los Árboles
+categorical_pipeline = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
 
-plt.subplot(2,3,5)
-metrics = knn_param_grid['knn__metric']
-mean_scores_metrics = [knn_results[i] for i in range(len(metrics))]
-plt.plot(metrics, mean_scores_metrics, marker='^', linestyle='-', color="green")
-plt.xlabel("KNN Metric")
-plt.ylabel("CV Balanced Accuracy")
-plt.title("Effect of metric on KNN")
+numeric_pipeline = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', RobustScaler())
+])
 
-plt.subplot(2,3,6)
-plt.plot(knn_param_grid['knn__n_neighbors'],
-         [knn_results[i] for i in range(len(knn_param_grid['knn__n_neighbors']))],
-         marker='s', linestyle='-', color="orange")
-plt.xlabel("KNN n_neighbors")
-plt.ylabel("CV Balanced Accuracy")
-plt.title("Effect of n_neighbors on KNN")
+# Combinar ambos pipelines:
+preprocessing_pipeline = ColumnTransformer(transformers=[
+    ('num', numeric_pipeline, num_cols),
+    ('cat', categorical_pipeline, cat_cols)
+])
 
-plt.tight_layout()
-plt.show()
-print("Best combination for Trees:", grid_search_treeHPO.best_params_)
-print("Best combination for KNN:", grid_search_knnHPO.best_params_)
+inner = StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED)
 
-# 4.2 Modelos Avanzados: Regresión Logística y SVM
+lr_no_reg_pipeline = Pipeline(steps=[
+    ('preprocessing', preprocessing_pipeline),
+    ('log_reg', LogisticRegression(penalty=None, solver='lbfgs', max_iter=1000, random_state=SEED))
+])
+# Entrenar el pipeline en los datos de entrenamiento (X_train, y_train)
+start_time = time.time()
+lr_no_reg_pipeline.fit(X_train, y_train)
+lr_no_reg_time = time.time() - start_time
 
-# Regresión Logística Default
-log_reg_pipeline = Pipeline(steps=[
+# Predecir usando el pipeline (se aplican todas las transformaciones)
+y_pred_lr_no_reg = lr_no_reg_pipeline.predict(X_train)
+print("Logistic Regression (sin regularización) Tiempo de entrenamiento: {:.4f} segundos".format(lr_no_reg_time))
+print("Balanced Accuracy (LR sin regularización): {:.4f}".format(balanced_accuracy_score(y_train, y_pred_lr_no_reg)))
+
+lr_l1 = Pipeline(steps=[
+    ('preprocessing', preprocessing_pipeline),
+    ('log_reg', LogisticRegression(penalty='l1', solver='liblinear', max_iter=1000, random_state=SEED))
+])
+start_time = time.time()
+lr_l1.fit(X_train, y_train)
+lr_l1_time = time.time() - start_time
+y_pred_lr_l1 = lr_l1.predict(X_train)
+print("\nLogistic Regression (L1 regularización) Tiempo de entrenamiento: {:.4f} segundos".format(lr_l1_time))
+print("Balanced Accuracy (LR L1): {:.4f}".format(balanced_accuracy_score(y_train, y_pred_lr_l1)))
+
+# Extraer los nombres de las características resultantes del preprocesamiento:
+feature_names = lr_l1.named_steps['preprocessing'].get_feature_names_out()
+# Construir la serie con los coeficientes y los nombres correctos:
+coef_lr_l1 = lr_l1.named_steps['log_reg'].coef_[0]
+feature_importance_lr = pd.Series(coef_lr_l1, index=feature_names)
+print("\nImportancia de atributos (coeficientes) en LR L1:")
+print(feature_importance_lr.sort_values(ascending=False))
+
+lr_pipeline = Pipeline(steps=[
     ('preprocessing', preprocessing_pipeline),
     ('log_reg', LogisticRegression(max_iter=1000, solver='liblinear', random_state=SEED))
 ])
-start_time = time.time()
-log_reg_pipeline.fit(X_train, y_train)
-log_reg_time = time.time() - start_time
-print("\nLogistic Regression Default Training Time: {:.4f} seconds".format(log_reg_time))
-# Evaluación usando cross_val_score con el pipeline correcto (no log_reg_time)
-cv_scores_log = cross_val_score(log_reg_pipeline, X_train, y_train, cv=inner, scoring='balanced_accuracy')
-print("Logistic Regression Default CV scores:", cv_scores_log)
-print("Mean Logistic Regression Default CV score: {:.4f}".format(cv_scores_log.mean()))
-
-# Regresión Logística HPO
-log_reg_param_grid = {
+lr_param_grid = {
     'log_reg__C': [0.01, 0.1, 1, 10, 100],
     'log_reg__penalty': ['l1', 'l2']
 }
-grid_search_log = GridSearchCV(estimator=log_reg_pipeline, param_grid=log_reg_param_grid, cv=inner, scoring='balanced_accuracy')
-grid_search_log.fit(X_train, y_train)
-print("\nBest parameters for Logistic Regression:", grid_search_log.best_params_)
-print("Best CV balanced accuracy for Logistic Regression:", grid_search_log.best_score_)
+grid_search_lr = GridSearchCV(estimator=lr_pipeline, param_grid=lr_param_grid, cv=inner, scoring='balanced_accuracy')
+start_time = time.time()
+grid_search_lr.fit(X_train, y_train)
+lr_hpo_time = time.time() - start_time
+print("\n[HPO] Mejor LR parameters:", grid_search_lr.best_params_)
+print("[HPO] Mejor CV Balanced Accuracy (LR): {:.4f}".format(grid_search_lr.best_score_))
+print("Tiempo HPO LR: {:.4f} seconds".format(lr_hpo_time))
 
-# SVM Default
-svm_pipeline_default = Pipeline(steps=[
+svm_default_pipeline = Pipeline(steps=[
     ('preprocessing', preprocessing_pipeline),
     ('svm', SVC(random_state=SEED))
 ])
-start_time = time.time()
-svm_pipeline_default.fit(X_train, y_train)
-svm_time = time.time() - start_time
-print("\nSVM Default Training Time: {:.4f} seconds".format(svm_time))
-y_pred_svm = svm_pipeline_default.predict(X_train)
-print("Balanced Accuracy SVM (default):", balanced_accuracy_score(y_train, y_pred_svm))
 
-# SVM HPO
+start_time = time.time()
+svm_default_pipeline.fit(X_train, y_train)
+svm_default_time = time.time() - start_time
+y_pred_svm_default = svm_default_pipeline.predict(X_train)
+print("\nSVM (default) Training Time: {:.4f} seconds".format(svm_default_time))
+print("Balanced Accuracy (SVM default): {:.4f}".format(balanced_accuracy_score(y_train, y_pred_svm_default)))
+
+# Creamos nuevamente el pipeline para SVM (para mayor claridad)
 svm_pipeline = Pipeline(steps=[
     ('preprocessing', preprocessing_pipeline),
     ('svm', SVC(random_state=SEED))
 ])
+
+# Definimos el grid de hiperparámetros para SVM
 svm_param_grid = {
     'svm__C': [0.1, 1, 10],
     'svm__kernel': ['linear', 'rbf']
 }
+
+# Búsqueda de hiperparámetros con validación cruzada interna
 grid_search_svm = GridSearchCV(estimator=svm_pipeline, param_grid=svm_param_grid, cv=inner, scoring='balanced_accuracy')
+start_time = time.time()
 grid_search_svm.fit(X_train, y_train)
-print("\nBest parameters for SVM:", grid_search_svm.best_params_)
-print("Best CV balanced accuracy for SVM:", grid_search_svm.best_score_)
+svm_hpo_time = time.time() - start_time
+print("\n[HPO] Mejor SVM parameters:", grid_search_svm.best_params_)
+print("[HPO] Mejor CV Balanced Accuracy (SVM): {:.4f}".format(grid_search_svm.best_score_))
+print("Tiempo HPO SVM: {:.4f} seconds".format(svm_hpo_time))
 
-# 5. Análisis de Resultados y Selección del Modelo Final
-print("\n--- Análisis de Resultados ---\n")
-print("KNN Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_search_knnHPO.best_score_))
-print("Trees Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_search_treeHPO.best_score_))
-print("Logistic Regression Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_search_log.best_score_))
-print("SVM Optimized CV Balanced Accuracy (hipotético): {:.4f}".format(grid_search_svm.best_score_))
-print("\nBasado en estos resultados, el modelo KNN optimizado muestra el mejor desempeño en términos de balanced accuracy y estabilidad.")
-print("Por ello, se seleccionará el modelo KNN optimizado para realizar las predicciones en el conjunto de competición.")
-
-# 6. Guardado del Modelo Final
-best_knn_model = grid_search_knnHPO.best_estimator_
-joblib.dump(best_knn_model, "modelo_final.pkl")
-print("\nModelo final guardado como 'modelo_final.pkl'")
-
-# 7. Conclusiones y Comentarios
-print("\n--- Conclusiones y Comentarios ---")
-print("• Se han explorado y preprocesado los datos, definiendo pipelines para variables numéricas y categóricas.")
-print("• La evaluación interna (usando validación cruzada y GridSearchCV) permitió ajustar los hiperparámetros de los modelos básicos (KNN y Árboles) y avanzados (Regresión Logística y SVM).")
-print("• Entre los modelos evaluados, el KNN optimizado mostró el mejor desempeño en términos de balanced accuracy y estabilidad.")
-print("• Por lo tanto, el modelo final para la competición será el KNN optimizado.")
-print("• Se recomienda complementar este análisis con la evaluación outer en el conjunto de test y documentar el uso de herramientas como ChatGPT.")
-
-# Fin del script.
+# Extracción de importancia de atributos para SVM
+if grid_search_svm.best_params_['svm__kernel'] == 'linear':
+    svm_best_linear = grid_search_svm.best_estimator_.named_steps['svm']
+    svm_coef = svm_best_linear.coef_[0]
+    feature_importance_svm = pd.Series(svm_coef, index=X_train.columns)
+    print("\nImportancia de atributos (coeficientes) en SVM lineal:")
+    print(feature_importance_svm.sort_values(ascending=False))
+else:
+    print("\nSVM con kernel no lineal (RBF) no permite extraer directamente importancia de atributos.")

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import time
 import joblib
+import os
 
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
@@ -21,9 +22,9 @@ from sklearn.dummy import DummyClassifier
 # Fijamos la semilla para la reproducibilidad (NIA)
 SEED = 495723
 np.random.seed(SEED)
-
+current_dir = os.path.dirname(os.path.abspath(__file__))
 # 1. Cargamos el dataset
-data_path = "lab1/data/attrition_availabledata_05.csv"
+data_path = os.path.join(current_dir, "..", "data", "attrition_availabledata_05.csv")
 df = pd.read_csv(data_path)
 
 # 2. Dimensiones y primeras filas

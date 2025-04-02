@@ -2,13 +2,19 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
+import os
+
+# Obtener la ruta del directorio del script actual
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # 1. Cargar el modelo final entrenado
-model = joblib.load("modelo_final.pkl")
+model_path = os.path.join(current_dir, "modelo_final.pkl")
+model = joblib.load(model_path)
 print("Modelo final cargado correctamente.")
 
 # 2. Cargar el dataset de competición
-data_comp_path = "lab1/data/attrition_competition_05.csv"  # Ajusta la ruta si es necesario
+# Ajusta la ruta relativa según la ubicación del archivo
+data_comp_path = os.path.join(current_dir, "..", "data", "attrition_competition_05.csv")
 df_comp = pd.read_csv(data_comp_path)
 print("Dimensiones del dataset de competición:", df_comp.shape)
 

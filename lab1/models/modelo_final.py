@@ -30,7 +30,7 @@ df = pd.read_csv(data_path)
 # 2. Dimensiones y primeras filas
 print("En esta primera exploración hemos podido observar que la dimensión de nuestro dataset es:", df.shape)
 print("\nPor ejemplo, las 5 primeras filas del dataset se ven así:")
-# display(df.head())
+#display(df.head())
 
 # 3. Información general de columnas
 print("\nInformación general del DataFrame:")
@@ -165,13 +165,6 @@ tree_default_scores = cross_val_score(tree_default, X_train, y_train, cv=inner, 
 print("\nÁrboles default:")
 print("Tiempo de entrenamiento:", tree_default_time, "segundos")
 print("CV Balanced Accuracy:", tree_default_scores.mean())
-
-# Evaluación con un modelo trivial (dummy) para referencia
-dummy = Pipeline(steps=[
-    ('dummy', DummyClassifier(strategy='most_frequent'))
-])
-dummy_scores = cross_val_score(dummy, X_train, y_train, cv=inner, scoring='balanced_accuracy')
-print("\nModelo Dummy (estrategia 'most_frequent') CV Balanced Accuracy:", dummy_scores.mean())
 
 # KNN HPO
 knn_param_grid = {
